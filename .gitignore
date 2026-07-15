@@ -5,3 +5,4 @@ target/
 .env
 .workbuddy/
 apps/desktop/src-tauri/target/
+apps/desktop/test-fixtures/

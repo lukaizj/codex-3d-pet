@@ -5,7 +5,7 @@ import type { PetEvent, PetState } from "@codex-3d-pet/protocol";
 import { PET_STATES } from "@codex-3d-pet/protocol";
 import { AvatarStage } from "./components/AvatarStage";
 import { PET_STATE_CAPTIONS, PET_STATE_LABELS, StatusBadge } from "./components/StatusBadge";
-import { beginWindowDrag, getBridgeInfo, importVrm, layoutPetWindow, prepareTransparentWindow, reportPersonaSelected, setAlwaysOnTop, setClickThrough } from "./lib/tauri";
+import { beginWindowDrag, getBridgeInfo, importVrm, layoutPetWindow, prepareTransparentWindow, reportPersonaSelected, setAlwaysOnTop, setClickThrough, writeSelfTestResult } from "./lib/tauri";
 import { usePetShapeHitTest } from "./lib/pet-shape-hit";
 import type { AvatarController } from "./lib/avatar-controller";
 import { loadPreferences, savePreferences } from "./lib/preferences";
@@ -122,6 +122,54 @@ export function App() {
     setError("检测到旧版角色路径，请重新导入 VRM。");
     void reportPersonaSelected(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 打包自检：由 CODEX_PET_SELF_TEST=/path/to.vrm 触发自动导入并写结果文件
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen<string>("pet://self-test-import", async (event) => {
+      const sourcePath = event.payload;
+      try {
+        const localPath = await importVrm(sourcePath);
+        const name = sourcePath.split(/[\\/]/).pop()?.replace(/\.vrm$/i, "") || "self-test";
+        const persona = {
+          id: "self-test",
+          name,
+          filePath: localPath,
+          importedAt: new Date().toISOString(),
+        };
+        setPendingPersona(persona);
+        setError(undefined);
+        setSettingsOpen(false);
+
+        window.setTimeout(() => {
+          const diagnosis = avatarControllerRef.current?.diagnoseMaterials() ?? {
+            ok: false,
+            meshCount: 0,
+            textureMaps: 0,
+            coloredMaterials: 0,
+            note: "controller-missing",
+          };
+          void writeSelfTestResult({
+            ok: diagnosis.ok,
+            sourcePath,
+            localPath,
+            diagnosis,
+            finishedAt: new Date().toISOString(),
+          });
+        }, 4000);
+      } catch (reason) {
+        void writeSelfTestResult({
+          ok: false,
+          sourcePath,
+          error: reason instanceof Error ? reason.message : String(reason),
+          finishedAt: new Date().toISOString(),
+        });
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
   }, []);
 
   useEffect(() => {

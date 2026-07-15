@@ -128,6 +128,46 @@ export class AvatarController {
     this.setPresentation(this.state);
   }
 
+  /** 自检：统计贴图/材质是否可用 */
+  diagnoseMaterials() {
+    if (!this.currentVrm) {
+      return { ok: false, meshCount: 0, textureMaps: 0, coloredMaterials: 0, note: "no vrm" };
+    }
+
+    let meshCount = 0;
+    let textureMaps = 0;
+    let coloredMaterials = 0;
+
+    this.currentVrm.scene.traverse((object) => {
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      meshCount += 1;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        if (!material || typeof material !== "object") continue;
+        const maps = material as unknown as Record<string, unknown>;
+        if (
+          maps.map ||
+          maps.emissiveMap ||
+          maps.normalMap ||
+          maps.shadeMultiplyTexture ||
+          maps.matcapTexture ||
+          maps.rimMultiplyTexture
+        ) {
+          textureMaps += 1;
+        }
+        const color = maps.color ?? maps.litFactor ?? maps.shadeColorFactor;
+        if (color && typeof color === "object" && "r" in color) {
+          const { r, g, b } = color as { r: number; g: number; b: number };
+          if (!(r > 0.92 && g > 0.92 && b > 0.92)) coloredMaterials += 1;
+        }
+      }
+    });
+
+    const ok = meshCount > 0 && (textureMaps > 0 || coloredMaterials > 0);
+    return { ok, meshCount, textureMaps, coloredMaterials, note: ok ? "ok" : "white-look" };
+  }
+
   setPresentation(state: PetState) {
     if (state !== this.state) {
       this.state = state;

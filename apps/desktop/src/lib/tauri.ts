@@ -32,6 +32,10 @@ export function readVrmBytes(path: string) {
   return invoke<ArrayBuffer | number[] | Uint8Array>("read_vrm_bytes", { path });
 }
 
+export function writeSelfTestResult(result: Record<string, unknown>) {
+  return invoke<void>("write_self_test_result", { result });
+}
+
 export function beginWindowDrag() {
   return getCurrentWindow().startDragging();
 }

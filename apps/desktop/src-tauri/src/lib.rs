@@ -265,6 +265,20 @@ fn import_vrm(source_path: String, app: AppHandle) -> Result<String, String> {
     Ok(destination.to_string_lossy().into_owned())
 }
 
+/// 自检结果写入（仅 CODEX_PET_SELF_TEST 环境变量启用时使用）
+#[tauri::command]
+fn write_self_test_result(result: serde_json::Value, app: AppHandle) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("无法访问应用数据目录：{error}"))?
+        .join("self-test-result.json");
+    let json = serde_json::to_string_pretty(&result)
+        .map_err(|error| format!("无法序列化自检结果：{error}"))?;
+    fs::write(&path, format!("{json}\n")).map_err(|error| format!("无法写入自检结果：{error}"))?;
+    Ok(())
+}
+
 /// 直接读本地 VRM 字节，供前端用 Blob/parse 加载（绕过 asset 协议问题）。
 #[tauri::command]
 fn read_vrm_bytes(path: String) -> Result<Response, String> {
@@ -391,6 +405,17 @@ pub fn run() {
             let bridge_for_server = bridge.clone();
             app.manage(bridge);
             tauri::async_runtime::spawn(start_bridge(bridge_for_server));
+
+            if let Ok(source) = std::env::var("CODEX_PET_SELF_TEST") {
+                if !source.is_empty() {
+                    let handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        let _ = handle.emit("pet://self-test-import", source);
+                    });
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -398,7 +423,8 @@ pub fn run() {
             set_persona_selected,
             set_click_through,
             import_vrm,
-            read_vrm_bytes
+            read_vrm_bytes,
+            write_self_test_result
         ])
         .run(tauri::generate_context!())
         .expect("运行 Codex 3D 桌宠时发生错误");

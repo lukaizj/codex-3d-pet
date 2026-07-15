@@ -22,6 +22,16 @@ export async function setClickThrough(enabled: boolean) {
   await invoke<void>("set_click_through", { enabled });
 }
 
+/** 复制用户选择的 VRM 到应用目录，返回本地稳定路径。 */
+export function importVrm(sourcePath: string) {
+  return invoke<string>("import_vrm", { sourcePath });
+}
+
+/** 读取本地 VRM 字节（绕过 convertFileSrc / asset 协议）。 */
+export function readVrmBytes(path: string) {
+  return invoke<ArrayBuffer | number[] | Uint8Array>("read_vrm_bytes", { path });
+}
+
 export function beginWindowDrag() {
   return getCurrentWindow().startDragging();
 }

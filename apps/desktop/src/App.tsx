@@ -5,7 +5,7 @@ import type { PetEvent, PetState } from "@codex-3d-pet/protocol";
 import { PET_STATES } from "@codex-3d-pet/protocol";
 import { AvatarStage } from "./components/AvatarStage";
 import { PET_STATE_CAPTIONS, PET_STATE_LABELS, StatusBadge } from "./components/StatusBadge";
-import { beginWindowDrag, getBridgeInfo, layoutPetWindow, prepareTransparentWindow, reportPersonaSelected, setAlwaysOnTop, setClickThrough } from "./lib/tauri";
+import { beginWindowDrag, getBridgeInfo, importVrm, layoutPetWindow, prepareTransparentWindow, reportPersonaSelected, setAlwaysOnTop, setClickThrough } from "./lib/tauri";
 import { usePetShapeHitTest } from "./lib/pet-shape-hit";
 import type { AvatarController } from "./lib/avatar-controller";
 import { loadPreferences, savePreferences } from "./lib/preferences";
@@ -147,9 +147,20 @@ export function App() {
     });
     if (!selected || Array.isArray(selected)) return;
 
-    const name = selected.split(/[\\/]/).pop()?.replace(/\.vrm$/i, "") || "VRM 角色";
-    setPendingPersona({ id: crypto.randomUUID(), name, filePath: selected, importedAt: new Date().toISOString() });
-    setError(undefined);
+    try {
+      // 复制进应用目录，避免安装包受 macOS 文件权限限制读不到原路径
+      const localPath = await importVrm(selected);
+      const name = selected.split(/[\\/]/).pop()?.replace(/\.vrm$/i, "") || "VRM 角色";
+      setPendingPersona({
+        id: crypto.randomUUID(),
+        name,
+        filePath: localPath,
+        importedAt: new Date().toISOString(),
+      });
+      setError(undefined);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "导入 VRM 失败。");
+    }
   };
 
   const handleAvatarLoadSuccess = useCallback(

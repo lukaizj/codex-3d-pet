@@ -12,6 +12,7 @@ use axum::{
 use rand::{distr::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use tauri::{
+    ipc::Response,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     AppHandle, Emitter, LogicalSize, Manager, Size, State as TauriState,
@@ -219,6 +220,65 @@ fn set_click_through(enabled: bool, app: AppHandle) -> Result<(), String> {
         .map_err(|error| format!("无法更新鼠标穿透设置：{error}"))
 }
 
+/// 把用户选中的 VRM 复制到应用目录，避免 macOS 沙箱/权限导致再次读取失败。
+#[tauri::command]
+fn import_vrm(source_path: String, app: AppHandle) -> Result<String, String> {
+    let source = std::path::Path::new(&source_path);
+    if !source.is_file() {
+        return Err("所选的 VRM 文件不存在。".into());
+    }
+
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if extension != "vrm" {
+        return Err("请选择 .vrm 文件。".into());
+    }
+
+    let bytes = fs::read(source).map_err(|error| format!("无法读取 VRM 文件：{error}"))?;
+    if bytes.is_empty() {
+        return Err("VRM 文件为空。".into());
+    }
+    if bytes.len() > 200 * 1024 * 1024 {
+        return Err("VRM 文件过大（超过 200MB）。".into());
+    }
+
+    let personas_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("无法访问应用数据目录：{error}"))?
+        .join("personas");
+    fs::create_dir_all(&personas_dir)
+        .map_err(|error| format!("无法创建角色目录：{error}"))?;
+
+    let file_name = format!(
+        "{}.vrm",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0)
+    );
+    let destination = personas_dir.join(file_name);
+    fs::write(&destination, &bytes).map_err(|error| format!("无法保存 VRM 文件：{error}"))?;
+    Ok(destination.to_string_lossy().into_owned())
+}
+
+/// 直接读本地 VRM 字节，供前端用 Blob/parse 加载（绕过 asset 协议问题）。
+#[tauri::command]
+fn read_vrm_bytes(path: String) -> Result<Response, String> {
+    let file = std::path::Path::new(&path);
+    if !file.is_file() {
+        return Err("角色文件不存在。请重新导入 VRM。".into());
+    }
+    let bytes = fs::read(file).map_err(|error| format!("无法读取角色文件：{error}"))?;
+    if bytes.is_empty() {
+        return Err("角色文件为空。请重新导入 VRM。".into());
+    }
+    Ok(Response::new(bytes))
+}
+
 fn random_secret() -> String {
     rand::rng()
         .sample_iter(&Alphanumeric)
@@ -336,7 +396,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             bridge_info,
             set_persona_selected,
-            set_click_through
+            set_click_through,
+            import_vrm,
+            read_vrm_bytes
         ])
         .run(tauri::generate_context!())
         .expect("运行 Codex 3D 桌宠时发生错误");

@@ -1,5 +1,4 @@
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import {
   AmbientLight,
@@ -17,6 +16,7 @@ import {
   WebGLRenderer,
 } from "three";
 import type { PetState } from "@codex-3d-pet/protocol";
+import { readVrmBytes } from "./tauri";
 import type { AnimationMode } from "../types/pet";
 
 const MODE_INTENSITY: Record<AnimationMode, number> = {
@@ -96,10 +96,19 @@ export class AvatarController {
 
     let gltf;
     try {
-      gltf = await loader.loadAsync(convertFileSrc(filePath));
+      const raw = await readVrmBytes(filePath);
+      const bytes =
+        raw instanceof ArrayBuffer
+          ? new Uint8Array(raw)
+          : raw instanceof Uint8Array
+            ? raw
+            : Uint8Array.from(raw);
+      // 用 ArrayBuffer 直接 parse，避免 asset:// 在安装包里丢 buffer / 贴图
+      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      gltf = await loader.parseAsync(buffer, "");
     } catch (reason) {
       const detail = reason instanceof Error ? `：${reason.message}` : "";
-      throw new Error(`无法读取 VRM 文件。请确认文件仍在原位置，并允许应用访问该文件所在目录${detail}`);
+      throw new Error(`无法读取 VRM 文件。请重新导入角色文件${detail}`);
     }
 
     const vrm = gltf.userData.vrm as VRM | undefined;

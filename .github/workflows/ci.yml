@@ -40,12 +40,13 @@ jobs:
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @codex-3d-pet/protocol build
       - run: pnpm --filter @codex-3d-pet/desktop tauri build ${{ matrix.args }}
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner == 'windows-latest' && 'windows-setup-exe' || 'macos-dmg' }}
           path: |
-            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            apps/desktop/src-tauri/target/**/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/**/release/bundle/nsis/*-setup.exe
           if-no-files-found: error

@@ -4,7 +4,7 @@ import { AvatarController } from "../lib/avatar-controller";
 import type { AnimationMode } from "../types/pet";
 
 /** 动画逻辑重大更新时 +1，强制重建控制器（避免 HMR 残留旧实例） */
-const CONTROLLER_REVISION = 7;
+const CONTROLLER_REVISION = 8;
 
 interface AvatarStageProps {
   personaPath?: string;
@@ -13,7 +13,6 @@ interface AvatarStageProps {
   animationMode: AnimationMode;
   onLoadError: (message: string) => void;
   onLoadSuccess?: (filePath: string) => void;
-  onLoadWarning?: (message: string) => void;
   onControllerChange?: (controller: AvatarController | undefined) => void;
 }
 
@@ -24,7 +23,6 @@ export function AvatarStage({
   animationMode,
   onLoadError,
   onLoadSuccess,
-  onLoadWarning,
   onControllerChange,
 }: AvatarStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -62,10 +60,8 @@ export function AvatarStage({
 
     let active = true;
     void controllerRef.current.load(personaPath).then(
-      (warning) => {
-        if (!active) return;
-        onLoadSuccess?.(personaPath);
-        if (warning) onLoadWarning?.(warning);
+      () => {
+        if (active) onLoadSuccess?.(personaPath);
       },
       (error: unknown) => {
         if (active) onLoadError(error instanceof Error ? error.message : "无法加载 VRM 角色。");
@@ -75,7 +71,7 @@ export function AvatarStage({
     return () => {
       active = false;
     };
-  }, [personaPath, onLoadError, onLoadSuccess, onLoadWarning, CONTROLLER_REVISION]);
+  }, [personaPath, onLoadError, onLoadSuccess, CONTROLLER_REVISION]);
 
   return (
     <canvas

@@ -26,6 +26,10 @@ function stateLabel(state: PetState) {
   return PET_STATE_LABELS[state];
 }
 
+function isManagedPersonaPath(filePath: string) {
+  return filePath.includes("/personas/") || filePath.includes("\\personas\\");
+}
+
 export function App() {
   const [preferences, setPreferences] = useState<PetPreferences>(() => loadPreferences());
   const [pendingPersona, setPendingPersona] = useState<PetPreferences["persona"]>();
@@ -110,6 +114,16 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 旧版本把 VRM 路径指到 Downloads 等外部目录，安装包读不到贴图
+  useEffect(() => {
+    const persona = preferences.persona;
+    if (!persona || isManagedPersonaPath(persona.filePath)) return;
+    persist({ ...preferences, persona: undefined });
+    setError("检测到旧版角色路径，请重新导入 VRM。");
+    void reportPersonaSelected(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     void setAlwaysOnTop(Boolean(preferences.persona)).catch(() => undefined);
   }, [preferences.persona]);
@@ -191,10 +205,6 @@ export function App() {
     },
     [pendingPersona, preferences.persona],
   );
-
-  const handleAvatarLoadWarning = useCallback((message: string) => {
-    setError(message);
-  }, []);
 
   const removePersona = async () => {
     setPendingPersona(undefined);
@@ -325,7 +335,6 @@ export function App() {
           animationMode={preferences.animationMode}
           onLoadError={handleAvatarLoadError}
           onLoadSuccess={handleAvatarLoadSuccess}
-          onLoadWarning={handleAvatarLoadWarning}
           onControllerChange={(controller) => {
             avatarControllerRef.current = controller;
           }}

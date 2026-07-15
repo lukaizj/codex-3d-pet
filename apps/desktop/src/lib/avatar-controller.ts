@@ -1,4 +1,5 @@
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import {
   AmbientLight,
@@ -96,16 +97,7 @@ export class AvatarController {
 
     let gltf;
     try {
-      const raw = await readVrmBytes(filePath);
-      const bytes =
-        raw instanceof ArrayBuffer
-          ? new Uint8Array(raw)
-          : raw instanceof Uint8Array
-            ? raw
-            : Uint8Array.from(raw);
-      // 用 ArrayBuffer 直接 parse，避免 asset:// 在安装包里丢 buffer / 贴图
-      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-      gltf = await loader.parseAsync(buffer, "");
+      gltf = await loadVrmGltf(loader, filePath);
     } catch (reason) {
       const detail = reason instanceof Error ? `：${reason.message}` : "";
       throw new Error(`无法读取 VRM 文件。请重新导入角色文件${detail}`);
@@ -123,6 +115,8 @@ export class AvatarController {
       // ignore
     }
 
+    refreshVrmMaterials(vrm);
+
     this.currentVrm?.scene.removeFromParent();
     this.currentVrm = vrm;
     this.rootBaseY = vrm.scene.position.y;
@@ -132,9 +126,6 @@ export class AvatarController {
     this.shadow.visible = true;
     this.stateStartedAt = this.clock.elapsedTime;
     this.setPresentation(this.state);
-
-    // 软提示：白模半成品提醒即可，不能拦截正常含材质色的角色
-    return summarizeTextureIssue(vrm);
   }
 
   setPresentation(state: PetState) {
@@ -421,53 +412,64 @@ export class AvatarController {
   }
 }
 
-/** 粗查疑似白模半成品（仅软提示，不拦截加载） */
-function summarizeTextureIssue(vrm: VRM): string | undefined {
-  let meshCount = 0;
-  let visiblyMateriated = 0;
+async function loadVrmGltf(loader: GLTFLoader, filePath: string) {
+  const errors: string[] = [];
 
+  // 应用目录内的文件：asset 协议最稳，贴图 blob 也能正常走 ImageLoader
+  try {
+    return await loader.loadAsync(convertFileSrc(filePath));
+  } catch (reason) {
+    errors.push(reason instanceof Error ? reason.message : "asset 加载失败");
+  }
+
+  const raw = await readVrmBytes(filePath);
+  const bytes =
+    raw instanceof ArrayBuffer
+      ? new Uint8Array(raw)
+      : raw instanceof Uint8Array
+        ? raw
+        : Uint8Array.from(raw);
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+  const blob = new Blob([buffer], { type: "model/gltf-binary" });
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await loader.loadAsync(objectUrl);
+  } catch (reason) {
+    errors.push(reason instanceof Error ? reason.message : "blob 加载失败");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  try {
+    return await loader.parseAsync(buffer, "");
+  } catch (reason) {
+    errors.push(reason instanceof Error ? reason.message : "内存解析失败");
+  }
+
+  throw new Error(errors.join("；"));
+}
+
+function refreshVrmMaterials(vrm: VRM) {
   vrm.scene.traverse((object) => {
     const mesh = object as Mesh;
     if (!mesh.isMesh) return;
-    meshCount += 1;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const material of materials) {
       if (!material || typeof material !== "object") continue;
-      if (materialLooksDressed(material as unknown as Record<string, unknown>)) {
-        visiblyMateriated += 1;
-        break;
+      material.needsUpdate = true;
+      const maps = material as unknown as Record<string, { needsUpdate?: boolean } | undefined>;
+      for (const key of [
+        "map",
+        "emissiveMap",
+        "normalMap",
+        "shadeMultiplyTexture",
+        "matcapTexture",
+        "rimMultiplyTexture",
+      ]) {
+        const texture = maps[key];
+        if (texture) texture.needsUpdate = true;
       }
     }
   });
-
-  if (meshCount === 0) {
-    return "角色没有可渲染网格，请换一个完整导出的 VRM。";
-  }
-  if (visiblyMateriated === 0 || visiblyMateriated / meshCount < 0.1) {
-    return "角色看起来像白模（缺少贴图或材质色）。建议用 VRoid Studio「导出 VRM」成品；Blender 导出请确认已烘焙材质。";
-  }
-  return undefined;
-}
-
-function materialLooksDressed(material: Record<string, unknown>): boolean {
-  if (
-    material.map ||
-    material.emissiveMap ||
-    material.normalMap ||
-    material.shadeMultiplyTexture ||
-    material.litMultiplyTexture ||
-    material.matcapTexture ||
-    material.rimMultiplyTexture
-  ) {
-    return true;
-  }
-
-  const color = material.color ?? material.litFactor ?? material.shadeColorFactor;
-  if (color && typeof color === "object" && "r" in color && "g" in color && "b" in color) {
-    const { r, g, b } = color as { r: number; g: number; b: number };
-    // 非近白即视为有材质色（纯色 VRM / 无位图也能正常显示）
-    return !(r > 0.92 && g > 0.92 && b > 0.92);
-  }
-
-  return false;
 }

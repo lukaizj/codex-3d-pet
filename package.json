@@ -8,7 +8,7 @@
     "test": "pnpm --filter @codex-3d-pet/protocol build && pnpm --filter @codex-3d-pet/protocol test && pnpm --filter @codex-3d-pet/mcp-server test && pnpm --filter @codex-3d-pet/desktop test",
     "desktop": "pnpm --filter @codex-3d-pet/desktop tauri",
     "mcp": "pnpm --filter @codex-3d-pet/mcp-server start",
-    "package": "pnpm --filter @codex-3d-pet/desktop tauri build && bash scripts/collect-installer.sh",
+    "package": "pnpm --filter @codex-3d-pet/protocol build && pnpm --filter @codex-3d-pet/desktop tauri build && bash scripts/collect-installer.sh",
     "package:mac": "pnpm package",
     "package:win": "pnpm --filter @codex-3d-pet/desktop tauri build"
   }

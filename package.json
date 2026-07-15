@@ -1,0 +1,15 @@
+{
+  "name": "codex-3d-pet",
+  "private": true,
+  "packageManager": "pnpm@10.31.0",
+  "scripts": {
+    "build": "pnpm --filter @codex-3d-pet/protocol build && pnpm --filter @codex-3d-pet/mcp-server build && pnpm --filter @codex-3d-pet/desktop build",
+    "check": "pnpm --filter @codex-3d-pet/protocol build && pnpm --filter @codex-3d-pet/mcp-server check && pnpm --filter @codex-3d-pet/desktop check",
+    "test": "pnpm --filter @codex-3d-pet/protocol build && pnpm --filter @codex-3d-pet/protocol test && pnpm --filter @codex-3d-pet/mcp-server test && pnpm --filter @codex-3d-pet/desktop test",
+    "desktop": "pnpm --filter @codex-3d-pet/desktop tauri",
+    "mcp": "pnpm --filter @codex-3d-pet/mcp-server start",
+    "package": "pnpm --filter @codex-3d-pet/desktop tauri build && bash scripts/collect-installer.sh",
+    "package:mac": "pnpm package",
+    "package:win": "pnpm --filter @codex-3d-pet/desktop tauri build"
+  }
+}

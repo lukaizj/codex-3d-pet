@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Codex 3D 桌宠">
+  <defs>
+    <linearGradient id="background" x1="54" y1="36" x2="462" y2="482" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172554"/>
+      <stop offset="0.5" stop-color="#111b3d"/>
+      <stop offset="1" stop-color="#24134b"/>
+    </linearGradient>
+    <linearGradient id="shell" x1="154" y1="135" x2="373" y2="393" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b8f7ff"/>
+      <stop offset="0.34" stop-color="#62e7f8"/>
+      <stop offset="0.72" stop-color="#8875f7"/>
+      <stop offset="1" stop-color="#d6a5ff"/>
+    </linearGradient>
+    <linearGradient id="face" x1="217" y1="202" x2="307" y2="344" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101e4d"/>
+      <stop offset="1" stop-color="#1f1647"/>
+    </linearGradient>
+    <linearGradient id="ear" x1="155" y1="129" x2="250" y2="291" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6ef4ff"/>
+      <stop offset="1" stop-color="#866cf4"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="0" cy="0" r="1" gradientTransform="translate(256 256) rotate(90) scale(218)">
+      <stop stop-color="#64e7fb" stop-opacity="0.3"/>
+      <stop offset="0.56" stop-color="#7769f6" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#0f1738" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#background)"/>
+  <rect x="18" y="18" width="476" height="476" rx="102" fill="none" stroke="#c2f5ff" stroke-opacity="0.15" stroke-width="2"/>
+  <circle cx="256" cy="256" r="218" fill="url(#aura)"/>
+  <path d="M92 163H420M92 256H420M92 349H420M163 92V420M256 92V420M349 92V420" fill="none" stroke="#9c9cff" stroke-opacity="0.07" stroke-width="2"/>
+
+  <g filter="url(#softGlow)" opacity="0.56">
+    <circle cx="158" cy="180" r="18" fill="#5ff1fb"/>
+    <circle cx="355" cy="345" r="22" fill="#9e76ff"/>
+  </g>
+
+  <g stroke-linejoin="round">
+    <path d="M151 245 156 130c1-18 18-26 32-15l68 54 68-54c14-11 31-3 32 15l5 115c24 37 25 104 2 143-30 50-77 75-139 75s-109-25-139-75c-23-39-22-106 2-143Z" fill="#0c1639" stroke="url(#shell)" stroke-width="17"/>
+    <path d="m166 227 9-82 55 47" fill="#172b60" stroke="url(#ear)" stroke-width="11"/>
+    <path d="m346 227-9-82-55 47" fill="#201852" stroke="url(#ear)" stroke-width="11"/>
+    <path d="M164 260c0-52 41-94 92-94s92 42 92 94v61c0 55-41 98-92 98s-92-43-92-98v-61Z" fill="url(#face)" stroke="#b8f7ff" stroke-opacity="0.5" stroke-width="4"/>
+  </g>
+
+  <path d="M183 284c21-20 43-29 73-29s52 9 73 29" fill="none" stroke="#b8f7ff" stroke-opacity="0.24" stroke-linecap="round" stroke-width="4"/>
+  <g filter="url(#glow)">
+    <path d="M198 302c0-18 15-32 33-32s33 14 33 32c0 8-5 14-12 14h-42c-7 0-12-6-12-14Z" fill="#66ebfb"/>
+    <path d="M248 302c0-18 15-32 33-32s33 14 33 32c0 8-5 14-12 14h-42c-7 0-12-6-12-14Z" fill="#9b78ff"/>
+  </g>
+  <path d="M223 359c19 12 47 12 66 0" fill="none" stroke="#d9fbff" stroke-linecap="round" stroke-width="8"/>
+  <path d="M256 169v43" stroke="#d9fbff" stroke-linecap="round" stroke-opacity="0.72" stroke-width="5"/>
+  <circle cx="256" cy="158" r="7" fill="#e7fbff" filter="url(#glow)"/>
+
+  <g fill="#c9f9ff" filter="url(#glow)">
+    <path d="M390 105l5 17 17 5-17 5-5 17-5-17-17-5 17-5 5-17Z"/>
+    <path d="m124 348 3 10 10 3-10 3-3 10-3-10-10-3 10-3 3-10Z"/>
+  </g>
+  <circle cx="386" cy="177" r="5" fill="#9076ff"/>
+  <circle cx="132" cy="233" r="4" fill="#65edf9"/>
+</svg>

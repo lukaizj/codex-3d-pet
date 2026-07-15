@@ -13,6 +13,7 @@ interface AvatarStageProps {
   animationMode: AnimationMode;
   onLoadError: (message: string) => void;
   onLoadSuccess?: (filePath: string) => void;
+  onLoadWarning?: (message: string) => void;
   onControllerChange?: (controller: AvatarController | undefined) => void;
 }
 
@@ -23,6 +24,7 @@ export function AvatarStage({
   animationMode,
   onLoadError,
   onLoadSuccess,
+  onLoadWarning,
   onControllerChange,
 }: AvatarStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,8 +62,10 @@ export function AvatarStage({
 
     let active = true;
     void controllerRef.current.load(personaPath).then(
-      () => {
-        if (active) onLoadSuccess?.(personaPath);
+      (warning) => {
+        if (!active) return;
+        onLoadSuccess?.(personaPath);
+        if (warning) onLoadWarning?.(warning);
       },
       (error: unknown) => {
         if (active) onLoadError(error instanceof Error ? error.message : "无法加载 VRM 角色。");
@@ -71,7 +75,7 @@ export function AvatarStage({
     return () => {
       active = false;
     };
-  }, [personaPath, onLoadError, onLoadSuccess, CONTROLLER_REVISION]);
+  }, [personaPath, onLoadError, onLoadSuccess, onLoadWarning, CONTROLLER_REVISION]);
 
   return (
     <canvas

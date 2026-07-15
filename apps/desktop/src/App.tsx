@@ -159,6 +159,7 @@ export function App() {
       const result = applyPersonaImport(preferences.persona, pendingPersona, { ok: true });
       persist({ ...preferences, persona: result.persona });
       setPendingPersona(undefined);
+      setError(undefined);
       setSettingsOpen(false);
       void reportPersonaSelected(true);
     },
@@ -179,6 +180,10 @@ export function App() {
     },
     [pendingPersona, preferences.persona],
   );
+
+  const handleAvatarLoadWarning = useCallback((message: string) => {
+    setError(message);
+  }, []);
 
   const removePersona = async () => {
     setPendingPersona(undefined);
@@ -309,6 +314,7 @@ export function App() {
           animationMode={preferences.animationMode}
           onLoadError={handleAvatarLoadError}
           onLoadSuccess={handleAvatarLoadSuccess}
+          onLoadWarning={handleAvatarLoadWarning}
           onControllerChange={(controller) => {
             avatarControllerRef.current = controller;
           }}

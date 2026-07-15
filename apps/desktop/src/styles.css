@@ -526,6 +526,10 @@ code {
   bottom: 12px;
   left: 12px;
   margin: 0;
+  max-height: 40%;
+  overflow: auto;
+  white-space: normal;
+  word-break: break-word;
 }
 
 @media (max-height: 620px) {

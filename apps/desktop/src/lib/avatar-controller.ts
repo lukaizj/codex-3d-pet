@@ -114,13 +114,6 @@ export class AvatarController {
       // ignore
     }
 
-    const textureIssue = summarizeTextureIssue(vrm);
-    if (textureIssue) {
-      throw new Error(
-        `角色贴图异常（${textureIssue}）。当前会显示成白色 T 姿。请用 VRoid Studio「导出 VRM」的成品；若刚从 Blender 导出，请确认已烘焙并带上材质贴图。`,
-      );
-    }
-
     this.currentVrm?.scene.removeFromParent();
     this.currentVrm = vrm;
     this.rootBaseY = vrm.scene.position.y;
@@ -130,6 +123,9 @@ export class AvatarController {
     this.shadow.visible = true;
     this.stateStartedAt = this.clock.elapsedTime;
     this.setPresentation(this.state);
+
+    // 软提示：白模半成品提醒即可，不能拦截正常含材质色的角色
+    return summarizeTextureIssue(vrm);
   }
 
   setPresentation(state: PetState) {
@@ -416,10 +412,10 @@ export class AvatarController {
   }
 }
 
-/** 粗查是否基本没贴图（Blender 半成品 / 导出丢材质时常见） */
+/** 粗查疑似白模半成品（仅软提示，不拦截加载） */
 function summarizeTextureIssue(vrm: VRM): string | undefined {
   let meshCount = 0;
-  let textured = 0;
+  let visiblyMateriated = 0;
 
   vrm.scene.traverse((object) => {
     const mesh = object as Mesh;
@@ -428,21 +424,41 @@ function summarizeTextureIssue(vrm: VRM): string | undefined {
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const material of materials) {
       if (!material || typeof material !== "object") continue;
-      const maps = material as {
-        map?: unknown;
-        emissiveMap?: unknown;
-        shadeMultiplyTexture?: unknown;
-        litMultiplyTexture?: unknown;
-      };
-      if (maps.map || maps.emissiveMap || maps.shadeMultiplyTexture || maps.litMultiplyTexture) {
-        textured += 1;
+      if (materialLooksDressed(material as unknown as Record<string, unknown>)) {
+        visiblyMateriated += 1;
         break;
       }
     }
   });
 
-  if (meshCount === 0) return "没有可渲染网格";
-  if (textured === 0) return "未检测到贴图";
-  if (textured / meshCount < 0.15) return "绝大多数网格没有贴图";
+  if (meshCount === 0) {
+    return "角色没有可渲染网格，请换一个完整导出的 VRM。";
+  }
+  if (visiblyMateriated === 0 || visiblyMateriated / meshCount < 0.1) {
+    return "角色看起来像白模（缺少贴图或材质色）。建议用 VRoid Studio「导出 VRM」成品；Blender 导出请确认已烘焙材质。";
+  }
   return undefined;
+}
+
+function materialLooksDressed(material: Record<string, unknown>): boolean {
+  if (
+    material.map ||
+    material.emissiveMap ||
+    material.normalMap ||
+    material.shadeMultiplyTexture ||
+    material.litMultiplyTexture ||
+    material.matcapTexture ||
+    material.rimMultiplyTexture
+  ) {
+    return true;
+  }
+
+  const color = material.color ?? material.litFactor ?? material.shadeColorFactor;
+  if (color && typeof color === "object" && "r" in color && "g" in color && "b" in color) {
+    const { r, g, b } = color as { r: number; g: number; b: number };
+    // 非近白即视为有材质色（纯色 VRM / 无位图也能正常显示）
+    return !(r > 0.92 && g > 0.92 && b > 0.92);
+  }
+
+  return false;
 }

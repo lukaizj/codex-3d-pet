@@ -266,22 +266,24 @@ button { cursor: pointer; }
 /* 桌宠头顶状态文字：不挡角色主体 */
 .state-caption {
   position: absolute;
-  top: 10px;
+  top: 8px;
   left: 50%;
   z-index: 6;
   margin: 0;
-  padding: 5px 10px;
-  border: 1px solid rgb(255 255 255 / 18%);
+  padding: 3px 9px;
+  border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 999px;
   color: #f8fafc;
-  background: rgb(15 23 42 / 78%);
-  box-shadow: 0 8px 20px rgb(2 6 23 / 28%);
+  background: rgb(15 23 42 / 48%);
+  backdrop-filter: blur(8px);
+  box-shadow: none;
   font-family: "DM Mono", monospace;
-  font-size: 11px;
-  letter-spacing: .04em;
+  font-size: 10px;
+  letter-spacing: .03em;
   white-space: nowrap;
   pointer-events: none;
   transform: translateX(-50%);
+  opacity: 0.92;
 }
 
 .state-caption.state-idle { border-color: #86efac66; color: #bbf7d0; }

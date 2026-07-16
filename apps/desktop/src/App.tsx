@@ -387,7 +387,7 @@ export function App() {
             avatarControllerRef.current = controller;
           }}
         />
-        {petMode && (
+        {petMode && presentation.state !== "idle" && (
           <p className={`state-caption state-${presentation.state}`} data-no-drag>
             {PET_STATE_CAPTIONS[presentation.state]}
           </p>

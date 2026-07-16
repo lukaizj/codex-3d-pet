@@ -51,6 +51,25 @@ export class AvatarController {
   private stateStartedAt = 0;
   /** 角色场景基准高度；蹦跳只叠在此之上，避免改到 hips 把模型拽出画面 */
   private rootBaseY = 0;
+  /** 姿势平滑：每帧朝目标插值，避免状态切换时瞬间抽动 */
+  private readonly pose = {
+    spineX: 0,
+    spineY: 0,
+    spineZ: 0,
+    chestX: 0,
+    headX: 0,
+    headY: 0,
+    headZ: 0,
+    leftArmX: 0.06,
+    leftArmY: 0,
+    leftArmZ: 1.22,
+    rightArmX: 0.06,
+    rightArmY: 0,
+    rightArmZ: -1.22,
+    leftLowerX: -0.12,
+    rightLowerX: -0.12,
+    bob: 0,
+  };
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new WebGLRenderer({
@@ -304,6 +323,162 @@ export class AvatarController {
 
     const t = this.clock.elapsedTime;
     const intensity = MODE_INTENSITY[this.animationMode];
+    // VRM T 姿手臂水平；约 ±1.25 才能自然垂在身侧（不是 0.1）
+    const ARM_DOWN = 1.22;
+    const breathe = Math.sin((t * Math.PI * 2) / 4.2) * 0.02 * intensity;
+    const sway = Math.sin((t * Math.PI * 2) / 6.5) * 0.035 * intensity;
+    const since = Math.max(0, t - this.stateStartedAt);
+
+    const target = {
+      spineX: 0,
+      spineY: 0,
+      spineZ: 0,
+      chestX: 0,
+      headX: 0,
+      headY: 0,
+      headZ: 0,
+      leftArmX: 0,
+      leftArmY: 0,
+      leftArmZ: ARM_DOWN,
+      rightArmX: 0,
+      rightArmY: 0,
+      rightArmZ: -ARM_DOWN,
+      leftLowerX: 0,
+      rightLowerX: 0,
+      bob: 0,
+    };
+
+    switch (this.state) {
+      case "idle": {
+        // 自然站立：手臂垂下、轻呼吸、偶尔转头
+        target.spineZ = sway;
+        target.spineX = breathe;
+        target.chestX = breathe * 0.7;
+        target.headY = Math.sin(t * 0.45) * 0.12 * intensity;
+        target.headX = breathe * 0.4 - 0.02;
+        target.leftArmZ = ARM_DOWN + Math.sin(t * 0.9) * 0.04 * intensity;
+        target.rightArmZ = -ARM_DOWN - Math.sin(t * 0.9 + 0.6) * 0.04 * intensity;
+        target.leftArmX = 0.06 * intensity;
+        target.rightArmX = 0.06 * intensity;
+        target.leftLowerX = -0.12 * intensity;
+        target.rightLowerX = -0.12 * intensity;
+        target.bob = Math.sin(t * 1.05) * 0.004 * intensity;
+        break;
+      }
+      case "thinking": {
+        // 托腮思考：右手抬到下巴，头微倾，左手自然下垂
+        target.spineX = breathe + 0.04 * intensity;
+        target.spineZ = sway * 0.35;
+        target.headX = 0.12 * intensity;
+        target.headY = 0.18 * intensity + Math.sin(t * 0.7) * 0.05 * intensity;
+        target.headZ = 0.1 * intensity;
+        target.rightArmZ = -0.35 * intensity;
+        target.rightArmX = -1.05 * intensity + Math.sin(t * 1.4) * 0.04 * intensity;
+        target.rightArmY = 0.35 * intensity;
+        target.rightLowerX = -1.35 * intensity;
+        target.leftArmZ = ARM_DOWN * 0.95;
+        target.leftArmX = 0.08 * intensity;
+        target.leftLowerX = -0.2 * intensity;
+        target.bob = Math.sin(t * 0.8) * 0.003 * intensity;
+        break;
+      }
+      case "working": {
+        // 认真干活：微前倾，双手在身前轻敲/比划
+        const tap = Math.sin(t * 5.5);
+        target.spineX = 0.1 * intensity + breathe;
+        target.spineZ = Math.sin(t * 1.8) * 0.03 * intensity;
+        target.chestX = 0.06 * intensity;
+        target.headX = 0.14 * intensity + Math.sin(t * 2.2) * 0.03 * intensity;
+        target.headY = Math.sin(t * 1.2) * 0.05 * intensity;
+        target.leftArmZ = 0.55 * intensity;
+        target.leftArmX = -0.55 * intensity + tap * 0.08 * intensity;
+        target.leftArmY = 0.15 * intensity;
+        target.leftLowerX = -1.05 * intensity;
+        target.rightArmZ = -0.55 * intensity;
+        target.rightArmX = -0.5 * intensity - tap * 0.08 * intensity;
+        target.rightArmY = -0.12 * intensity;
+        target.rightLowerX = -1.0 * intensity;
+        target.bob = Math.abs(Math.sin(t * 2.6)) * 0.008 * intensity;
+        break;
+      }
+      case "needs_attention": {
+        // 招手呼叫：右手高举挥动，身体轻晃
+        const wave = Math.sin(t * 5.2);
+        const bounce = Math.abs(Math.sin(t * 3.4));
+        target.spineZ = sway * 1.1;
+        target.spineX = -0.04 * intensity;
+        target.headY = Math.sin(t * 2.0) * 0.16 * intensity;
+        target.headX = -0.08 * intensity;
+        target.rightArmZ = 0.15 * intensity;
+        target.rightArmX = -1.55 * intensity + wave * 0.35 * intensity;
+        target.rightArmY = 0.25 * intensity;
+        target.rightLowerX = -0.35 * intensity + wave * 0.2 * intensity;
+        target.leftArmZ = ARM_DOWN * 0.9;
+        target.leftArmX = 0.1 * intensity;
+        target.leftLowerX = -0.15 * intensity;
+        target.bob = bounce * 0.018 * intensity;
+        break;
+      }
+      case "completed": {
+        // 开心举手：双手上举轻跳庆祝
+        const hop = Math.abs(Math.sin(t * Math.PI * 2.4));
+        const sparkle = Math.sin(t * 3.2);
+        target.spineX = -0.12 * intensity + breathe;
+        target.spineZ = sparkle * 0.05 * intensity;
+        target.chestX = -0.06 * intensity;
+        target.headX = -0.12 * intensity;
+        target.headY = sparkle * 0.08 * intensity;
+        target.leftArmZ = 0.25 * intensity;
+        target.leftArmX = -1.65 * intensity + sparkle * 0.08 * intensity;
+        target.leftArmY = 0.2 * intensity;
+        target.leftLowerX = -0.25 * intensity;
+        target.rightArmZ = -0.25 * intensity;
+        target.rightArmX = -1.65 * intensity - sparkle * 0.08 * intensity;
+        target.rightArmY = -0.2 * intensity;
+        target.rightLowerX = -0.25 * intensity;
+        target.bob = hop * 0.04 * intensity;
+        break;
+      }
+      case "error": {
+        // 沮丧：耸肩低头，双手抱臂/捂脸
+        target.spineX = 0.22 * intensity + breathe * 0.4;
+        target.spineZ = sway * 0.25;
+        target.chestX = 0.12 * intensity;
+        target.headX = 0.32 * intensity;
+        target.headY = Math.sin(t * 0.55) * 0.04 * intensity;
+        target.headZ = -0.06 * intensity;
+        target.leftArmZ = 0.7 * intensity;
+        target.leftArmX = -0.95 * intensity;
+        target.leftArmY = 0.45 * intensity;
+        target.leftLowerX = -1.2 * intensity;
+        target.rightArmZ = -0.7 * intensity;
+        target.rightArmX = -0.95 * intensity;
+        target.rightArmY = -0.45 * intensity;
+        target.rightLowerX = -1.2 * intensity;
+        target.bob = Math.sin(t * 0.9) * 0.002 * intensity;
+        break;
+      }
+    }
+
+    // 状态刚切换时略加速贴合，日常更柔和
+    const blend = since < 0.35 ? 0.22 : 0.12;
+    const p = this.pose;
+    p.spineX += (target.spineX - p.spineX) * blend;
+    p.spineY += (target.spineY - p.spineY) * blend;
+    p.spineZ += (target.spineZ - p.spineZ) * blend;
+    p.chestX += (target.chestX - p.chestX) * blend;
+    p.headX += (target.headX - p.headX) * blend;
+    p.headY += (target.headY - p.headY) * blend;
+    p.headZ += (target.headZ - p.headZ) * blend;
+    p.leftArmX += (target.leftArmX - p.leftArmX) * blend;
+    p.leftArmY += (target.leftArmY - p.leftArmY) * blend;
+    p.leftArmZ += (target.leftArmZ - p.leftArmZ) * blend;
+    p.rightArmX += (target.rightArmX - p.rightArmX) * blend;
+    p.rightArmY += (target.rightArmY - p.rightArmY) * blend;
+    p.rightArmZ += (target.rightArmZ - p.rightArmZ) * blend;
+    p.leftLowerX += (target.leftLowerX - p.leftLowerX) * blend;
+    p.rightLowerX += (target.rightLowerX - p.rightLowerX) * blend;
+    p.bob += (target.bob - p.bob) * blend;
 
     const spine = humanoid.getNormalizedBoneNode("spine");
     const chest =
@@ -311,142 +486,20 @@ export class AvatarController {
     const head = humanoid.getNormalizedBoneNode("head");
     const leftArm = humanoid.getNormalizedBoneNode("leftUpperArm");
     const rightArm = humanoid.getNormalizedBoneNode("rightUpperArm");
+    const leftLower = humanoid.getNormalizedBoneNode("leftLowerArm");
     const rightLower = humanoid.getNormalizedBoneNode("rightLowerArm");
 
     if (spine) {
-      spine.rotation.x = 0;
-      spine.rotation.y = 0;
-      spine.rotation.z = 0;
+      spine.rotation.set(p.spineX, p.spineY, p.spineZ);
     }
-    if (chest) chest.rotation.x = 0;
-    if (head) {
-      head.rotation.x = 0;
-      head.rotation.y = 0;
-      head.rotation.z = 0;
-    }
-    if (leftArm) {
-      leftArm.rotation.z = 0;
-      leftArm.rotation.x = 0;
-      leftArm.rotation.y = 0;
-    }
-    if (rightArm) {
-      rightArm.rotation.z = 0;
-      rightArm.rotation.x = 0;
-      rightArm.rotation.y = 0;
-    }
-    if (rightLower) rightLower.rotation.x = 0;
+    if (chest) chest.rotation.x = p.chestX;
+    if (head) head.rotation.set(p.headX, p.headY, p.headZ);
+    if (leftArm) leftArm.rotation.set(p.leftArmX, p.leftArmY, p.leftArmZ);
+    if (rightArm) rightArm.rotation.set(p.rightArmX, p.rightArmY, p.rightArmZ);
+    if (leftLower) leftLower.rotation.x = p.leftLowerX;
+    if (rightLower) rightLower.rotation.x = p.rightLowerX;
 
-    let bob = 0;
-    // 更慢、更小，避免「鬼畜」高频抽动
-    const breathe = Math.sin((t * Math.PI * 2) / 3.8) * 0.018 * intensity;
-    const sway = Math.sin((t * Math.PI * 2) / 5.2) * 0.045 * intensity;
-
-    switch (this.state) {
-      case "idle": {
-        bob = Math.abs(Math.sin(t * 1.1)) * 0.006 * intensity;
-        if (spine) {
-          spine.rotation.z = sway;
-          spine.rotation.x = breathe;
-        }
-        if (chest) chest.rotation.x = breathe * 0.8;
-        if (head) head.rotation.y = Math.sin(t * 0.55) * 0.1 * intensity;
-        if (leftArm) leftArm.rotation.z = 0.1 * intensity;
-        if (rightArm) rightArm.rotation.z = -0.1 * intensity;
-        break;
-      }
-      case "thinking": {
-        if (spine) {
-          spine.rotation.z = sway * 0.4;
-          spine.rotation.x = breathe + 0.06 * intensity;
-        }
-        if (head) {
-          head.rotation.x = 0.16 * intensity;
-          head.rotation.y = Math.sin(t * 0.85) * 0.14 * intensity;
-          head.rotation.z = 0.08 * intensity;
-        }
-        if (rightArm) {
-          rightArm.rotation.z = -0.75 * intensity;
-          rightArm.rotation.x = -0.85 * intensity + Math.sin(t * 1.6) * 0.06 * intensity;
-          rightArm.rotation.y = 0.2 * intensity;
-        }
-        if (rightLower) rightLower.rotation.x = -0.55 * intensity;
-        if (leftArm) leftArm.rotation.z = 0.18 * intensity;
-        break;
-      }
-      case "working": {
-        bob = Math.abs(Math.sin(t * 2.8)) * 0.018 * intensity;
-        if (spine) {
-          spine.rotation.z = Math.sin(t * 2.2) * 0.05 * intensity;
-          spine.rotation.x = breathe + 0.05 * intensity;
-        }
-        if (head) head.rotation.x = Math.sin(t * 2.4) * 0.06 * intensity;
-        if (leftArm) {
-          leftArm.rotation.z = 0.35 * intensity + Math.sin(t * 3.2) * 0.18 * intensity;
-          leftArm.rotation.x = Math.sin(t * 3.2 + 0.4) * 0.12 * intensity;
-        }
-        if (rightArm) {
-          rightArm.rotation.z = -0.35 * intensity - Math.sin(t * 3.2 + 0.9) * 0.18 * intensity;
-          rightArm.rotation.x = Math.sin(t * 3.2 + 1.3) * 0.12 * intensity;
-        }
-        break;
-      }
-      case "needs_attention": {
-        const wave = Math.sin(t * 4.2);
-        bob = Math.abs(wave) * 0.014 * intensity;
-        if (spine) spine.rotation.z = sway * 0.9;
-        if (head) {
-          head.rotation.y = Math.sin(t * 1.8) * 0.18 * intensity;
-          head.rotation.x = -0.06 * intensity;
-        }
-        if (rightArm) {
-          rightArm.rotation.z = -1.15 * intensity;
-          rightArm.rotation.x = -0.15 * intensity + wave * 0.4 * intensity;
-          rightArm.rotation.y = 0.12 * intensity;
-        }
-        if (rightLower) rightLower.rotation.x = wave * 0.25 * intensity;
-        if (leftArm) leftArm.rotation.z = 0.22 * intensity;
-        break;
-      }
-      case "completed": {
-        bob = Math.abs(Math.sin(t * Math.PI * 2.1)) * 0.035 * intensity;
-        if (spine) {
-          spine.rotation.x = -0.1 * intensity + breathe;
-          spine.rotation.z = Math.sin(t * 2.4) * 0.06 * intensity;
-        }
-        if (head) head.rotation.x = -0.1 * intensity;
-        if (leftArm) {
-          leftArm.rotation.z = 1.05 * intensity;
-          leftArm.rotation.x = -0.12 * intensity;
-        }
-        if (rightArm) {
-          rightArm.rotation.z = -1.05 * intensity;
-          rightArm.rotation.x = -0.12 * intensity;
-        }
-        break;
-      }
-      case "error": {
-        if (spine) {
-          spine.rotation.x = 0.18 * intensity + breathe * 0.5;
-          spine.rotation.z = sway * 0.35;
-        }
-        if (chest) chest.rotation.x = 0.1 * intensity;
-        if (head) {
-          head.rotation.x = 0.28 * intensity;
-          head.rotation.y = Math.sin(t * 0.7) * 0.06 * intensity;
-        }
-        if (leftArm) {
-          leftArm.rotation.z = 0.85 * intensity;
-          leftArm.rotation.x = -0.75 * intensity;
-        }
-        if (rightArm) {
-          rightArm.rotation.z = -0.85 * intensity;
-          rightArm.rotation.x = -0.75 * intensity;
-        }
-        break;
-      }
-    }
-
-    this.currentVrm.scene.position.y = this.rootBaseY + bob;
+    this.currentVrm.scene.position.y = this.rootBaseY + p.bob;
     this.currentVrm.scene.rotation.y = 0;
     this.currentVrm.scene.rotation.z = 0;
   }

@@ -4,7 +4,7 @@ import { AvatarController } from "../lib/avatar-controller";
 import type { AnimationMode } from "../types/pet";
 
 /** 动画逻辑重大更新时 +1，强制重建控制器（避免 HMR 残留旧实例） */
-const CONTROLLER_REVISION = 8;
+const CONTROLLER_REVISION = 9;
 
 interface AvatarStageProps {
   personaPath?: string;
